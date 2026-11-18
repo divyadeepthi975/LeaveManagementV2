@@ -66,7 +66,7 @@ namespace LeaveManagement.Migrations
 
                     b.HasIndex("ManagerId");
 
-                    b.ToTable("Employees");
+                    b.ToTable("Employees", (string)null);
                 });
 
             modelBuilder.Entity("LeaveManagement.Models.Entities.Leavebalance", b =>
@@ -96,7 +96,7 @@ namespace LeaveManagement.Migrations
                     b.HasIndex("employeeid", "leavetypeid")
                         .IsUnique();
 
-                    b.ToTable("Leavebalances");
+                    b.ToTable("Leavebalances", (string)null);
                 });
 
             modelBuilder.Entity("LeaveManagement.Models.Entities.Leaverequest", b =>
@@ -142,7 +142,7 @@ namespace LeaveManagement.Migrations
 
                     b.HasIndex("leavetypeid");
 
-                    b.ToTable("Leaverequests");
+                    b.ToTable("Leaverequests", (string)null);
                 });
 
             modelBuilder.Entity("LeaveManagement.Models.Entities.Leavetype", b =>
@@ -169,7 +169,7 @@ namespace LeaveManagement.Migrations
                     b.HasIndex("leavetypename")
                         .IsUnique();
 
-                    b.ToTable("Leavetypes");
+                    b.ToTable("Leavetypes", (string)null);
                 });
 
             modelBuilder.Entity("LeaveManagement.Models.Entities.Loginusers", b =>
@@ -202,7 +202,7 @@ namespace LeaveManagement.Migrations
                     b.HasIndex("username")
                         .IsUnique();
 
-                    b.ToTable("Loginuser");
+                    b.ToTable("Loginuser", (string)null);
                 });
 
             modelBuilder.Entity("LeaveManagement.Models.Entities.Employee", b =>
