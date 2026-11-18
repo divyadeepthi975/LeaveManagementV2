@@ -1,0 +1,326 @@
+﻿using LeaveManagement.Data;
+using LeaveManagement.DTO;
+using LeaveManagement.Models.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace LeaveManagement.Services
+{
+    public class LeaveService : ILeaveService
+    {
+        private readonly AppDbContext _db;
+
+        public LeaveService(AppDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task<LeaveRequestGetDTO?> ApplyLeaveAsync(LeaverequestDTO leaverequest)
+        {
+            var employee = await _db.Employees
+                .FirstOrDefaultAsync(e =>
+                    e.EmployeeId == leaverequest.employeeid);
+
+            if (employee == null || employee.IsActive==false)
+            {
+                throw new ArgumentException("Employee not found or inactive.");
+            }
+
+            var leavetype = await _db.Leavetypes
+                .FirstOrDefaultAsync(l =>
+                    l.leavetypeid == leaverequest.leavetypeid);
+
+            if (leavetype == null || leavetype.IsActive==false)
+            {
+                throw new ArgumentException("Leave type not found or inactive.");
+            }
+
+            if (leaverequest.fromdate > leaverequest.todate)
+            {
+                throw new ArgumentException(
+                    "From date cannot be after To date.");
+            }
+
+            int numberOfDays =
+                (leaverequest.todate.Date -
+                 leaverequest.fromdate.Date).Days + 1;
+
+            var balance = await _db.Leavebalances
+                .FirstOrDefaultAsync(b =>
+                    b.employeeid == leaverequest.employeeid &&
+                    b.leavetypeid == leaverequest.leavetypeid);
+
+            if (balance == null)
+            {
+                throw new ArgumentException(
+                    "Leave balance not found.");
+            }
+
+            int remainingDays =
+                balance.totaldays - balance.useddays;
+
+            if (numberOfDays > remainingDays)
+            {
+                throw new ArgumentException(
+                    $"Insufficient leave balance. Remaining days: {remainingDays}.");
+            }
+
+            var overlappingLeave = await _db.Leaverequests
+                .AnyAsync(l =>
+                    l.employeeid == leaverequest.employeeid &&
+                    l.status != "Rejected" &&
+                    leaverequest.fromdate.Date <= l.todate.Date &&
+                    leaverequest.todate.Date >= l.fromdate.Date);
+
+            if (overlappingLeave)
+            {
+                throw new ArgumentException(
+                    "Leave request overlaps with an existing leave period.");
+            }
+            if(string.IsNullOrEmpty(leaverequest.reason))
+            {
+                throw new ArgumentException("Reason for leave request is required.");
+            }
+            Leaverequest leave = new Leaverequest();
+            leave.employeeid= leaverequest.employeeid;
+            leave.leavetypeid= leaverequest.leavetypeid;
+            leave.fromdate= leaverequest.fromdate;
+            leave.todate= leaverequest.todate;
+            leave.reason= leaverequest.reason;
+            leave.Employee = employee;
+            leave.Leavetype = leavetype;
+
+            _db.Leaverequests.Add(leave);
+
+            await _db.SaveChangesAsync();
+
+            return MapToDTO(leave);
+        }
+
+        public async Task<IEnumerable<LeaveRequestGetDTO>> GetAllLeavesAsync(
+     int? employeeId = null,
+     int? leaveTypeId = null,
+     string? status = null,
+     DateTime? fromDate = null,
+     DateTime? toDate = null,
+     int? managerId = null)
+        {
+            var query = _db.Leaverequests.AsQueryable();
+
+            if (managerId.HasValue)
+            {
+                query = query.Where(l => _db.Employees.Any(e =>
+                    e.EmployeeId == l.employeeid &&
+                    e.ManagerId == managerId.Value));
+            }
+
+            if (employeeId.HasValue)
+            {
+                query = query.Where(l =>
+                    l.employeeid == employeeId.Value);
+            }
+
+            if (leaveTypeId.HasValue)
+            {
+                query = query.Where(l =>
+                    l.leavetypeid == leaveTypeId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                status = status.Trim().ToLower();
+
+                query = query.Where(l =>
+                    l.status == status);
+            }
+
+            if (fromDate.HasValue)
+            {
+                query = query.Where(l =>
+                    l.fromdate >= fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                query = query.Where(l =>
+                    l.todate <= toDate.Value);
+            }
+
+            return await query
+                .OrderByDescending(l => l.applieddate)
+                .Select(l => new LeaveRequestGetDTO
+                {
+                    leaverequestid = l.leaverequestid,
+                    employeeid = l.employeeid,
+                    leavetypeid = l.leavetypeid,
+                    fromdate = l.fromdate,
+                    todate = l.todate,
+                    reason = l.reason,
+                    status = l.status,
+                    applieddate = l.applieddate,
+                    approvedby = l.approvedby,
+                    comments = l.comments
+                })
+                .ToListAsync();
+        }
+        public async Task<IEnumerable<LeaveRequestGetDTO>>GetEmployeeLeavesAsync(int employeeId, int? managerId = null)
+        {
+            if (managerId.HasValue)
+            {
+                var isDirectReport = await _db.Employees
+                    .AnyAsync(e =>
+                        e.EmployeeId == employeeId &&
+                        e.ManagerId == managerId.Value);
+
+                if (!isDirectReport)
+                {
+                    return Enumerable.Empty<LeaveRequestGetDTO>();
+                }
+            }
+
+            var leaves = await _db.Leaverequests
+                .Where(l => l.employeeid == employeeId)
+                .OrderByDescending(l => l.applieddate)
+                .ToListAsync();
+
+            return leaves.Select(MapToDTO).ToList();
+        }
+
+        public async Task<LeaveRequestGetDTO?> GetLeaveByIdAsync(int id, int? managerId = null)
+        {
+            var leave = await _db.Leaverequests
+                .Include(l => l.Employee)
+                .FirstOrDefaultAsync(l =>
+                    l.leaverequestid == id);
+
+            if (leave == null)
+            {
+                return null;
+            }
+
+            if (managerId.HasValue && leave.Employee?.ManagerId != managerId.Value)
+            {
+                return null;
+            }
+
+            return MapToDTO(leave);
+        }
+
+        public async Task<string?> ApproveLeaveAsync(LeaveActionDTO leave, int managerId)
+        {
+            var leaveRequest = await _db.Leaverequests
+                .Include(l => l.Employee)
+                .Include(l => l.Leavetype)
+                .FirstOrDefaultAsync(l =>
+                    l.leaverequestid == leave.id);
+
+            if (leaveRequest == null)
+            {
+                return null;
+            }
+
+            if (leaveRequest.status != "Pending")
+            {
+                throw new ArgumentException(
+                    "Only pending leave requests can be approved.");
+            }
+            if (leaveRequest.Leavetype!.IsActive != true)
+            {
+                throw new ArgumentException(
+                   "The leave type with this ID is Inactive");
+            }
+            if (leaveRequest.Employee!.IsActive != true)
+            {
+                throw new ArgumentException(
+                   "The Employee with this ID is Inactive");
+            }
+
+            if (leaveRequest.Employee.ManagerId != managerId)
+            {
+                throw new ArgumentException(
+                    "You can approve leaves only for your direct report employees.");
+            }
+
+            var balance = await _db.Leavebalances
+                .Include(l=>l.Employee)
+                .Include(l=>l.Leavetype)
+                .FirstOrDefaultAsync(b =>
+                    b.employeeid == leaveRequest.employeeid &&
+                    b.leavetypeid == leaveRequest.leavetypeid);
+
+            if (balance == null)
+            {
+                throw new ArgumentException(
+                    "Leave balance not found.");
+            }
+
+            int numberOfDays =(leaveRequest.todate.Date-leaveRequest.fromdate.Date).Days + 1;
+
+            int remainingDays =balance.totaldays - balance.useddays;
+
+            if (numberOfDays > remainingDays)
+            {
+                throw new ArgumentException("Insufficient leave balance.");
+            }
+
+            leaveRequest.status = "Approved";
+            leaveRequest.approvedby = leave.approvedby;
+            leaveRequest.comments = leave.comments;
+
+            balance.useddays += numberOfDays;
+
+            await _db.SaveChangesAsync();
+
+            return "Your Leave is approved";
+        }
+
+        public async Task<string?> RejectLeaveAsync(LeaveActionDTO leave, int managerId)
+        {
+            var leaveRequest = await _db.Leaverequests
+                .Include(l => l.Employee)
+                .Include(l => l.Leavetype)
+                .FirstOrDefaultAsync(l =>
+                    l.leaverequestid == leave.id);
+
+            if (leaveRequest == null)
+            {
+                return null;
+            }
+
+            if (leaveRequest.status != "Pending")
+            {
+                throw new ArgumentException(
+                    "Only pending leave requests can be rejected.");
+            }
+
+            if (leaveRequest.Employee?.ManagerId != managerId)
+            {
+                throw new ArgumentException(
+                    "You can reject leaves only for your direct report employees.");
+            }
+
+            leaveRequest.status = "Rejected";
+            leaveRequest.approvedby = leave.approvedby;
+            leaveRequest.comments = leave.comments;
+
+            await _db.SaveChangesAsync();
+
+            return "Your Leave is rejected";
+        }
+        private LeaveRequestGetDTO MapToDTO(Leaverequest leave)
+        {
+            return new LeaveRequestGetDTO
+            {
+                leaverequestid = leave.leaverequestid,
+                employeeid = leave.employeeid,
+                leavetypeid = leave.leavetypeid,
+                fromdate = leave.fromdate,
+                todate = leave.todate,
+                reason = leave.reason,
+                status = leave.status,
+                applieddate = leave.applieddate,
+                approvedby = leave.approvedby,
+                comments = leave.comments
+            };
+        }
+    }
+}

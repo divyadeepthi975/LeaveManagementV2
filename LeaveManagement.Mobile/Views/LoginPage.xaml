@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:LeaveManagement.Mobile.ViewModels"
+             x:Class="LeaveManagement.Mobile.Views.LoginPage"
+             x:DataType="vm:LoginViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{AppThemeBinding Light=#F3F6F6, Dark=#10191B}">
+
+    <ScrollView>
+        <VerticalStackLayout VerticalOptions="Center"
+                             Padding="28"
+                             Spacing="22"
+                             MaximumWidthRequest="420">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Leave Management"
+                       FontSize="30"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light=#0F3D3E, Dark=#E4F1F0}" />
+                <Label Text="Sign in to request, review and track leave."
+                       FontSize="15"
+                       TextColor="{AppThemeBinding Light=#5B6B6C, Dark=#9FB3B4}" />
+            </VerticalStackLayout>
+
+            <Border Padding="20"
+                    StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light=#D5DEDE, Dark=#2A3A3C}"
+                    BackgroundColor="{AppThemeBinding Light=White, Dark=#162224}"
+                    StrokeShape="RoundRectangle 12">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Email or username" FontSize="13" />
+                        <Entry Text="{Binding Username}"
+                               Placeholder="you@company.com"
+                               Keyboard="Email"
+                               ReturnType="Next" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Password" FontSize="13" />
+                        <Entry Text="{Binding Password}"
+                               Placeholder="Password"
+                               IsPassword="True"
+                               ReturnType="Done"
+                               ReturnCommand="{Binding LoginCommand}" />
+                    </VerticalStackLayout>
+
+                    <Label Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding HasError}"
+                           TextColor="#C0392B"
+                           FontSize="13" />
+
+                    <Button Text="Sign in"
+                            Command="{Binding LoginCommand}" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="#0F3D3E" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

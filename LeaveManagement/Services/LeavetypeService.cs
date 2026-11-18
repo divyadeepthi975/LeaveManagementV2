@@ -1,0 +1,180 @@
+﻿using LeaveManagement.Data;
+using LeaveManagement.DTO;
+using LeaveManagement.Models.Entities;
+using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
+
+namespace LeaveManagement.Services
+{
+    public class LeavetypeService :ILeavetypeService
+    {
+        private readonly AppDbContext _db;
+        public LeavetypeService(AppDbContext db)
+        {
+            _db = db;
+        }
+        public async Task<Leavetype> AddAsync(LeavetypeDTO leavetype)
+        {
+            var similarName = await FindSimilarLeaveTypeNameAsync(leavetype.leavetypename);
+            if (similarName != null)
+            {
+                throw new ArgumentException($"A similar leave type already exists: {similarName}.");
+            }
+
+            Leavetype leave = new Leavetype();
+            leave.leavetypename = leavetype.leavetypename;
+            leave.maximumdays= leavetype.maximumdays;
+            _db.Leavetypes.Add(leave);
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new ArgumentException("Leave type with this name already exists.");
+            }
+
+            var employees = await _db.Employees 
+            .ToListAsync();
+            foreach (var employee in employees)
+            {
+                Leavebalance balance = new Leavebalance();
+
+                balance.employeeid = employee.EmployeeId;
+                balance.leavetypeid = leave.leavetypeid;
+                balance.totaldays = leave.maximumdays;
+                balance.useddays = 0;
+
+                _db.Leavebalances.Add(balance);
+            }
+            await _db.SaveChangesAsync();
+
+            return leave;
+        }
+
+        public async Task<string> DeleteAsync(int id)
+        {
+            var objLeavetype = await _db.Leavetypes.FirstOrDefaultAsync(l => l.leavetypeid == id);
+            if (objLeavetype == null)
+            {
+                return "leavetype with this ID doesnt exists";
+            }
+            if (objLeavetype.IsActive == false)
+            {
+                return "leavetype with this id is inactive";
+            }
+            objLeavetype.IsActive = false;
+            await _db.SaveChangesAsync();
+            return $"leavetype with the id-{id} is successfully deleted/deactivated";
+        }
+
+        public async Task<IEnumerable<Leavetype>> GetAllLeavetypeAsync()
+        {
+            return await _db.Leavetypes.ToListAsync();
+        }
+
+        public async Task<Leavetype?> GetLeavetypeAsync(int id)
+        {
+            Leavetype? leavetype=await _db.Leavetypes.FindAsync(id);
+            if(leavetype == null)
+            {
+                return null;
+            }
+            return leavetype;
+
+        }
+
+        public async Task<object?> UpdateLeavetypeAsync(LeavetypeIsactiveDTO leavetype)
+        {
+            var objLeavetype = await _db.Leavetypes.FirstOrDefaultAsync(l => l.leavetypeid == leavetype.leavetypeid);
+            if (objLeavetype == null)
+            {
+                return null;
+            }
+            if(objLeavetype.IsActive== true & leavetype.IsActive==false)
+            {
+                return "You can't deactivate leavetype with this method.";
+            }
+
+            var similarName = await FindSimilarLeaveTypeNameAsync(
+                leavetype.leavetypename,
+                leavetype.leavetypeid);
+
+            if (similarName != null)
+            {
+                throw new ArgumentException($"A similar leave type already exists: {similarName}.");
+            }
+
+            objLeavetype.leavetypeid = leavetype.leavetypeid;
+            objLeavetype.leavetypename = leavetype.leavetypename;
+            objLeavetype.maximumdays = leavetype.maximumdays;
+            objLeavetype.IsActive = leavetype.IsActive;
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new ArgumentException("Leave type with this name already exists.");
+            }
+
+            return objLeavetype;
+
+        }
+
+        public async Task<string> SetActiveStatusAsync(int id, bool isActive)
+        {
+            var objLeavetype = await _db.Leavetypes.FirstOrDefaultAsync(l => l.leavetypeid == id);
+            if (objLeavetype == null)
+            {
+                return "leavetype with this ID doesnt exists";
+            }
+
+            if (objLeavetype.IsActive == isActive)
+            {
+                return isActive
+                    ? "leavetype with this id is already active"
+                    : "leavetype with this id is already inactive";
+            }
+
+            objLeavetype.IsActive = isActive;
+            await _db.SaveChangesAsync();
+
+            return isActive
+                ? $"leavetype with the id-{id} is successfully activated"
+                : $"leavetype with the id-{id} is successfully deactivated";
+        }
+
+        private async Task<string?> FindSimilarLeaveTypeNameAsync(string name, int? excludedId = null)
+        {
+            var genericWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "leave",
+                "leaves",
+                "next"
+            };
+
+            var candidateWords = Regex.Matches(name, @"[\p{L}\p{N}]+")
+                .Select(match => match.Value)
+                .Where(word => !genericWords.Contains(word))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var existingNames = await _db.Leavetypes
+                .Where(leaveType => !excludedId.HasValue || leaveType.leavetypeid != excludedId.Value)
+                .Select(leaveType => leaveType.leavetypename)
+                .ToListAsync();
+
+            return existingNames.FirstOrDefault(existingName =>
+            {
+                var existingWords = Regex.Matches(existingName, @"[\p{L}\p{N}]+")
+                    .Select(match => match.Value)
+                    .Where(word => !genericWords.Contains(word))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                return candidateWords.Count > 0 && candidateWords.Overlaps(existingWords);
+            });
+        }
+    }
+}

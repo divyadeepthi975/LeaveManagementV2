@@ -1,0 +1,20 @@
+﻿using LeaveManagement.Models.Entities;
+using LeaveManagement.DTO;
+
+namespace LeaveManagement.Services
+{
+    public interface ILeavetypeService
+    {
+        Task<Leavetype> AddAsync(LeavetypeDTO leavetype);
+
+        Task<string> DeleteAsync(int id);
+
+        Task<IEnumerable<Leavetype>> GetAllLeavetypeAsync();
+
+        Task<Leavetype?> GetLeavetypeAsync(int id);
+
+        Task<object?> UpdateLeavetypeAsync(LeavetypeIsactiveDTO leavetype);
+
+        Task<string> SetActiveStatusAsync(int id, bool isActive);
+    }
+}
