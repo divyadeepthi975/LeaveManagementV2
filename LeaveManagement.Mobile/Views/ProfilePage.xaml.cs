@@ -8,6 +8,7 @@ public partial class ProfilePage : ContentPage
     private readonly SessionService _session;
     private readonly ApiService _api;
     private bool _showUpdateForm;
+ 
     private Entry? _nameEntry;
     private Entry? _emailEntry;
     private Entry? _departmentEntry;
@@ -52,12 +53,14 @@ public partial class ProfilePage : ContentPage
     private void RenderProfile(EmployeeDto current)
     {
         ProfileContent.Clear();
+        ProfileContent.Add(new Label{Text= $"EmployeeId:{current.EmployeeId}"});
+        ProfileContent.Add(new Label{Text=$"EmployeeCode:{current.EmployeeCode}"});
         ProfileContent.Add(new Label { Text = $"Name: {current.Name}" });
         ProfileContent.Add(new Label { Text = $"Email: {current.Email}" });
         ProfileContent.Add(new Label { Text = $"Department: {current.Department}" });
         ProfileContent.Add(new Label { Text = $"Role: {current.Role}" });
-        ProfileContent.Add(new Label { Text = $"Manager Id: {(current.ManagerId?.ToString() ?? "Not assigned")}" });
-        ProfileContent.Add(new Label { Text = $"Manager Name: {(!string.IsNullOrWhiteSpace(current.ManagerName) ? current.ManagerName : "Not assigned")}" });
+        ProfileContent.Add(new Label { Text = $"Manager Id: {(current.ManagerId?.ToString() ?? "No Manager")}" });
+        ProfileContent.Add(new Label { Text = $"Manager Name: {(!string.IsNullOrWhiteSpace(current.ManagerName) ? current.ManagerName : "No Manager")}" });
 
         if (_session.Role.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
             _session.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase))
@@ -88,6 +91,7 @@ public partial class ProfilePage : ContentPage
         ProfileContent.Add(new BoxView { HeightRequest = 1, Color = Colors.LightGray });
         ProfileContent.Add(new Label { Text = "Update profile", FontAttributes = FontAttributes.Bold });
 
+       
         _nameEntry = new Entry { Placeholder = "Name", Text = current.Name };
         _emailEntry = new Entry { Placeholder = "Email", Text = current.Email };
         _departmentEntry = new Entry { Placeholder = "Department", Text = current.Department };
@@ -95,7 +99,7 @@ public partial class ProfilePage : ContentPage
 
         var managerDetails = new Label
         {
-            Text = $"Manager Id: {(current.ManagerId?.ToString() ?? "Not assigned")} | Manager Name: {(!string.IsNullOrWhiteSpace(current.ManagerName) ? current.ManagerName : "Not assigned")}",
+            Text = $"Manager Id: {(current.ManagerId?.ToString() ?? "No Manager")} | Manager Name: {(!string.IsNullOrWhiteSpace(current.ManagerName) ? current.ManagerName : "Not assigned")}",
             FontSize = 12,
             TextColor = Colors.Gray
         };

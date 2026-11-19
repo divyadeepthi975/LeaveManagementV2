@@ -102,7 +102,7 @@ namespace LeaveManagement.Controllers
                 return Unauthorized("Invalid employee information.");
             }
 
-            // Employee can apply leave only for themselves
+           
             if (User.IsInRole("Employee") && employeeId != employeeid)
             {
                 return StatusCode(
@@ -127,7 +127,7 @@ namespace LeaveManagement.Controllers
             {
                 return StatusCode(
                     404,
-                    "LeaveRequests with this filter not found");
+                    "No Leave Requests Found");
             }
 
             return Ok(result);

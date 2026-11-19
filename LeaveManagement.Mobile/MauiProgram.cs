@@ -3,6 +3,9 @@ using LeaveManagement.Mobile.Services;
 using LeaveManagement.Mobile.ViewModels;
 using LeaveManagement.Mobile.Views;
 using Microsoft.Extensions.Logging;
+#if MAUI_DEVFLOW
+using Microsoft.Maui.DevFlow.Agent;
+#endif
 
 namespace LeaveManagement.Mobile;
 
@@ -11,6 +14,9 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+#if MAUI_DEVFLOW
+        builder.AddMauiDevFlowAgent();
+#endif
         var apiBaseAddress = new Uri(Constants.BaseUrl, UriKind.Absolute);
 
         builder
