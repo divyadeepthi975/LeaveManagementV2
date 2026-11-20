@@ -48,13 +48,26 @@ For authenticated requests, `AuthHeaderHandler.cs` attaches the token as an `Aut
 - `Views/LoginPage.xaml`: login screen layout.
 - `ViewModels/LoginViewModel.cs`: login screen behavior.
 - `Helpers/RoleShellFactory.cs`: tabs selected for each role.
-- `Views/PlaceholderPage.cs`: current dynamic implementation for dashboard, profile, employee, leave, and admin screens.
+- `Views/*.xaml` and `Views/*.xaml.cs`: dedicated dashboard, profile, employee, leave, and admin screens.
 - `Services/AuthService.cs`: login and API methods used by the app.
 - `Services/SessionService.cs`: signed-in user's token and identity.
 - `Models/ApiModels.cs`: client DTOs used to parse API responses and submit requests.
 - `Helpers/Constants.cs`: API base URL and login route.
 
-Most operational screens are currently assembled in code by `PlaceholderPage`, rather than having a separate XAML file for each screen. `LoginPage` is a XAML screen and uses a view model; the entire app does not use a single uniform MVVM pattern yet.
+Operational screens use dedicated MAUI page classes and XAML layouts. `LoginPage` uses `LoginViewModel`; the other operational pages generally combine page code-behind with `SessionService` and `ApiService`. `PlaceholderPage.cs` remains in the project but is not currently assigned by `RoleShellFactory` and should not be used as the primary implementation reference.
+
+The dedicated page files currently used by role navigation are:
+
+- `DashboardPage`: role-aware dashboard summary.
+- `ProfilePage`: current user's profile and Employee/Manager profile updates.
+- `LeaveBalancePage`: signed-in Employee's leave balances.
+- `ApplyLeavePage`: leave request submission.
+- `MyLeavesPage`: signed-in Employee's leave requests.
+- `LeaveTypesPage`: leave-type browsing and leave-type administration.
+- `ApprovalsPage`: Manager pending-request review.
+- `EmployeesPage`: Manager direct-report listing and management.
+- `UsersPage`: Admin user creation, listing, updates, role changes, and status changes.
+- `LeavesPage`: legacy/shared leave listing support.
 
 ## 4. What each role can do
 
@@ -87,10 +100,11 @@ The API derives the Manager's identity from the JWT. Employee listings and leave
 The Admin tabs currently configured in `RoleShellFactory.cs` are:
 
 - **Dashboard**: application-wide summary statistics.
+- **Profile**: view the signed-in Admin's account details. Admin profile editing is not currently offered in this page.
 - **Users**: create users, view all users, update other users, change other users' active status, and manage Employee/Manager roles. The signed-in Admin's own user record is excluded from update and activate/deactivate controls; the backend also rejects attempts to update or change the status of the current Admin account.
 - **Leave Types**: create, view, update, activate, and deactivate leave types.
 
-The backend supports `GET api/employee/me` for Admin profile data. The shared Profile screen is view-only for Admin, but **Profile is not currently included in the Admin tab list**, so the Admin cannot currently navigate to that screen from the dashboard.
+The backend supports `GET api/employee/me` for Admin profile data. The shared Profile screen is view-only for Admin.
 
 Role changes are distinct from editing profile fields or active status. An Admin can convert an Employee to Manager or a Manager to Employee, with the required manager relationship handled by the API.
 
@@ -145,6 +159,8 @@ These are the main routes visible in the current client and backend. Authorizati
 | Current user's details | `GET api/employee/me` | Employee, Manager, Admin |
 | Manager's employee list | `GET api/employee` | Manager; results are direct reports |
 | Employee details by ID | `GET api/employee/getbyid/{id}` | Manager (direct report only), Employee (self only) |
+| Update employee/profile | `PUT api/employee/updateemployee/{id}` | Employee (self), Manager (direct report) |
+| Change employee status | `PUT api/employee/{id}/status` | Manager (direct report) |
 | Employee leave balance | `GET api/employees/{employeeId}/leave-balance` | Employee/Manager, subject to ownership checks |
 | Apply for leave | `POST api/leaves` | Employee (self only) |
 | List leave requests | `GET api/leaves` | Employee (own requests; pass `employeeid`), Manager (direct reports) |
@@ -153,6 +169,8 @@ These are the main routes visible in the current client and backend. Authorizati
 | List leave types | `GET api/leavetypes/getall` | Employee, Manager, Admin |
 | Admin user management | `api/admin/...` | Admin |
 | Create/update leave types | `POST api/leavetypes/create-leavetype`, `PUT api/leavetypes/update-leavetype/{id}` | Admin and Manager in current API attributes |
+| Activate/deactivate leave type | `PUT api/admin/leave-types/{id}/activate`, `PUT api/admin/leave-types/{id}/deactivate` | Admin |
+| Delete leave type | `DELETE api/leavetypes/delete-leavetype/{id}` | Role(s) allowed by the controller |
 
 For a definitive route/permission check, read the corresponding controller attribute and method body. Permissions can evolve as the project changes.
 
@@ -209,11 +227,11 @@ When something does not work:
 
 A good order for reading the project is:
 
-1. `RoleShellFactory.cs` — see how role tabs are selected. Admin currently has Dashboard, Users, and Leave Types; a Profile API exists but Profile is not currently an Admin tab.
-2. `PlaceholderPage.cs` — follow a screen branch such as `"My Leaves"` or `"Approvals"`.
-3. `AuthService.cs` — find the API method called by that screen.
+1. `RoleShellFactory.cs` — see how role tabs are selected. Admin currently has Dashboard, Profile, Users, and Leave Types.
+2. The matching dedicated page, such as `MyLeavesPage`, `ApprovalsPage`, `EmployeesPage`, or `UsersPage` — follow its UI and load/action methods.
+3. `AuthService.cs` — find the API method called by that page.
 4. The matching controller — see authorization and request handling.
 5. The matching service — find validation and database queries.
 6. The DTO/entity and `AppDbContext.cs` — understand the data shape and relationships.
 
-For example, to follow leave application: look for the **Apply Leave** UI in `PlaceholderPage.cs`, then `ApplyLeaveAsync` in `AuthService.cs`, `ApplyLeave` in `LeavesController.cs`, `ApplyLeaveAsync` in `LeaveService.cs`, and finally `Leaverequest` / `Leavebalance` entities.
+For example, to follow leave application: look for **Apply Leave** in `ApplyLeavePage.xaml`/`ApplyLeavePage.xaml.cs`, then `ApplyLeaveAsync` in `AuthService.cs`, `ApplyLeave` in `LeavesController.cs`, `ApplyLeaveAsync` in `LeaveService.cs`, and finally `Leaverequest` / `Leavebalance` entities.
